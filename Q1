@@ -1,0 +1,238 @@
+/* 
+There is a queue of N cars waiting at the filling station. 3 fuel dispensers, x, y, z. When a car arrives at front of the queue, driver can choose to go to any dispenser not occupied. If all unoccupied dispensers have less than required by the driver he has to wait. if more than one dispenser has the required liter, the driver chooses the one labeled with the smallest letter.Calculate max amount of waiting time.
+
+Assume taking one liter of fuel takes exactly one second? example A[2,8,4,3,2], x= 7, y=11, z=3, then cars will be waiting 0, 0, 2, 2, 8 seconds.red liter, the driver chooses the one labeled with the smallest letter.
+
+So the max waiting time is 8 from [0,0,2,2,8] in this example.
+
+Reasoning:
+
+let 'w' = wait time
+A[0] = 2 --> goes to x. w += 0; fuel remaining at x = 7 - 2 = 5
+A[1] = 8 --> goes to y. w += 0; fuel remaining at y = 11 - 8 = 3
+A[2] = 4 --> can't go to z (only 3 liters of fuel) so wait till 'x' is available; w += 2; fuel remaining at x = 5 - 4 = 1
+A[3] = 3 --> can't go to x (not enough fuel) so wait till 'y' is available; so is wait time += 8 now? fuel remaining at y = 3 - 3 = 0
+A[4] = 2 --> goes to z. w += 0. fuel remaining at z = 3 - 2 = 1
+
+
+Solution:
+JAVA
+import java.util.*;
+import java.util.stream.Collectors;
+
+public class GasStationSolution {
+
+    public static void main(String[] args) {
+
+        int[] arr = {2, 8, 4, 3, 2};
+        GasStationSolution solution1 = new GasStationSolution();
+        System.out.println("Max waiting time " + solution1.solution(arr, 7, 11, 3));
+    }
+    public int solution(int[] arr, int x, int y, int z) {
+        GasStationG gasStation = new GasStationG();
+        gasStation.addPumpsWithCap(x,y,z);
+        List<Car> resolvedCars = new ArrayList<>();
+        List<Car> carStack = new ArrayList<>();
+        List<Integer> cars = Arrays.stream(arr).boxed().collect(Collectors.toList());
+
+        cars.forEach(p -> carStack.add(new Car(p,0)));
+        Pump freePump = null;
+        int index = 0;
+        while(index < carStack.size() - 1 || gasStation.areCarFueling()) {
+            if (carStack.size()>0){
+                if (!gasStation.pumpHasCapacity(carStack.get(index).fuelNeed)) {
+                    freePump = null;
+                }
+                freePump = gasStation.getFreePump(carStack.get(index).fuelNeed);
+
+            }
+
+            if (null != freePump) {
+                freePump.car = carStack.get(index);
+            } else {
+
+                Integer minFuelNeed = gasStation.getMinimumFuelNeed();
+                List<Car> filledCars = gasStation.resolveFilledCars(minFuelNeed);
+                for (int counter = index; counter< carStack.size(); counter++) {
+                    carStack.get(counter).waitTime += minFuelNeed;
+                }
+
+                index--;
+                resolvedCars.addAll(filledCars);
+            }
+            index++;
+        }
+
+        IntSummaryStatistics max = carStack.stream().map(car ->
+                car.waitTime).mapToInt(Integer::intValue).summaryStatistics();
+
+        return max.getMax();
+
+    }
+}
+
+
+class Car {
+    Integer fuelNeed;
+    Integer waitTime;
+
+    public Car(int fuelNeed, int waitTime) {
+        this.fuelNeed = fuelNeed;
+        this.waitTime = waitTime;
+    }
+}
+
+
+    class Pump {
+        Integer fuelCapacity;
+        Car car;
+        public Pump(int fuelCapacity, Car car) {
+            this.fuelCapacity = fuelCapacity;
+            car = car;
+        }
+    }
+
+
+class GasStationG{
+    public List<Pump> pumpList = new ArrayList<>();
+
+    public GasStationG(){
+
+    }
+
+    public void addPumpsWithCap(int ...arr ) {
+        Arrays.stream(arr).forEach(p->pumpList.add(new Pump(p,null)));
+
+    }
+
+    public boolean  areCarFueling() {
+        for (Pump pump: pumpList) {
+            if (pump.car != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public Boolean pumpHasCapacity(Integer fuelRequired) {
+        for(Pump pump: pumpList) {
+            if (pump.fuelCapacity >= fuelRequired) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public Pump getFreePump(Integer fuelRequired){
+        for(Pump pump: pumpList) {
+            if (pump.fuelCapacity >= fuelRequired && null == pump.car) {
+                return pump;
+            }
+        }
+        return null;
+    }
+
+    public List<Car> resolveFilledCars(Integer minFuelNeed) {
+        List<Car> carsFueled = new ArrayList<>();
+
+        for(Pump pump: pumpList) {
+            if (null != pump.car) {
+                pump.car.fuelNeed -= minFuelNeed;
+                pump.fuelCapacity -= minFuelNeed;
+                if (pump.car.fuelNeed <=0){
+                    carsFueled.add(pump.car);
+                    pump.car = null;
+                }
+            }
+        }
+
+        return carsFueled;
+
+    }
+
+    public Integer getMinimumFuelNeed() {
+        IntSummaryStatistics summaryStatistics = pumpList.stream()
+                .filter(pump -> null != pump.car).map(pump -> pump.car.fuelNeed)
+                .mapToInt(Integer::intValue).summaryStatistics();
+        return summaryStatistics.getMin();
+    }
+}
+
+
+Python:
+
+class Pump:
+    def __init__(self, fuel_capacity):
+        self.fuel_capacity = fuel_capacity
+        self.car = None
+
+class GasStation:
+    def __init__(self, pumps):
+        self.pumps = pumps
+
+    def pumps_have_capacity(self, fuel_required):
+        return any(pump.fuel_capacity >= fuel_required for pump in self.pumps)
+
+    def free_pump(self, fuel_required):
+        for pump in self.pumps:
+            if pump.fuel_capacity >= fuel_required and pump.car is None:
+                return pump
+        return None
+
+    def resolve_fuel_up(self):
+        # get next pump to be free (car with the least amount of fuel to fill up)
+        min_fuel_need = min(pump.car.fuel_need for pump in self.pumps if pump.car)
+
+        cars_all_fueled_up = []
+
+        for pump in self.pumps:
+            if pump.car:
+                pump.car.fuel_need -= min_fuel_need
+                pump.fuel_capacity -= min_fuel_need
+
+                if pump.car.fuel_need <= 0:
+                    cars_all_fueled_up.append(pump.car)
+                    pump.car = None
+
+        # Return the car, and the amount of fuel that was used
+        return cars_all_fueled_up, min_fuel_need
+
+    def are_cars_fueling_up(self):
+        return any(pump.car is not None for pump in self.pumps)
+
+
+class Car:
+    def __init__(self, fuel_need):
+        self.fuel_need = fuel_need
+        self.wait_time = 0
+
+
+def solution(A, X, Y, Z):
+    gas_station = GasStation([Pump(X), Pump(Y), Pump(Z)])
+    line = [Car(fuel_need) for fuel_need in A]
+    road = []
+
+    while line or gas_station.are_cars_fueling_up():
+        if line:
+            # Check if pumps have capacity for next car in line
+            if not gas_station.pumps_have_capacity(line[0].fuel_need):
+                return -1
+
+            free_pump = gas_station.free_pump(line[0].fuel_need)
+
+        if free_pump and line:
+            free_pump.car = line.pop(0)
+
+        else:
+            resolved_cars, fuel_amount = gas_station.resolve_fuel_up()
+            for car in line:
+                car.wait_time += fuel_amount
+            road.extend(resolved_cars)
+
+    return max(car.wait_time for car in road if car.wait_time > 0)
+
+
+if __name__ == "__main__":
+    assert solution([2, 8, 4, 3, 2], 7, 11, 3) == 8
+    assert solution([5], 4, 0, 3) == -1
+*/
